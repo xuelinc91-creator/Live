@@ -1,12 +1,12 @@
 <template>
 	<view class="home-container">
-		<!-- 直播画面区域 - 优化：改用CSS隐藏而非v-if卸载，保证视频后台播放 -->
+		<!-- 直播画面区域 -->
 		<view class="live-section" :class="{ 'collapsed-hide': isLiveCollapsed }">
-		<!-- 收起按钮 - 浮动在右下角（移到容器外面以避免web-view覆盖） -->
-		<view class="collapse-btn-floating" @click="toggleLiveCollapse" @touchstart="toggleLiveCollapse" @touchend="toggleLiveCollapse">
-			▲
-		</view>
-
+			<!-- 收起按钮 - 浮动在右下角 -->
+			<view class="collapse-btn-floating" @click="toggleLiveCollapse" @touchstart="toggleLiveCollapse" @touchend="toggleLiveCollapse">
+				▲
+			</view>
+			
 			<!-- 直播视频区域 -->
 			<view class="live-video-container">
 				<!-- 票数进度条对比 - 浮动在直播画面上方（实时统计） -->
@@ -55,44 +55,6 @@
 						<text class="play-icon">▶</text>
 					</view>
 
-					<!-- B站播放器 - 直播开始后显示 -->
-					<web-view
-						id="bilibiliWebView"
-						v-if="isLiveStarted && bilibiliEmbedPlayerUrl"
-						:key="playerRetryCount"
-						:src="bilibiliEmbedPlayerUrl"
-						class="bilibili-webview-container"
-						:class="{ 'collapsed-video': isLiveCollapsed }"
-						@load="onBilibiliPlayerLoad"
-						@error="onBilibiliPlayerError"
-					></web-view>
-
-					<!-- 加载中指示器 -->
-					<view v-if="isLiveStarted && !bilibiliPlayerLoaded && !iframeLoadError" class="player-loading">
-						<text class="loading-text">🔄 正在加载播放器...</text>
-					</view>
-
-					<!-- 加载失败后的手动重试按钮 -->
-					<view v-if="isLiveStarted && iframeLoadError && playerRetryCount >= 3" class="player-error-retry">
-						<text class="error-text">播放器加载失败</text>
-						<view class="retry-button" @click="reloadBilibiliPlayer">
-							<text class="retry-text">点击重试</text>
-						</view>
-					</view>
-
-					<!-- B站播放器标题遮罩层（隐藏B站原生标题） -->
-					<view
-						v-if="isLiveStarted"
-						class="bilibili-title-mask"
-					></view>
-					
-					<!-- 自定义视频标题覆盖层 -->
-					<view
-						v-if="isLiveStarted"
-						class="video-title-overlay"
-					>
-						<text class="video-title">{{ videoTitle }}</text>
-					</view>
 
 					<!-- 直播状态指示器和控制按钮 -->
 					<view class="live-status-overlay" v-if="isLiveStarted">
@@ -470,19 +432,7 @@
 				initialLeftVotes: 0, // 初始正方票数
 				initialRightVotes: 0, // 初始反方票数
 				
-				// 视频相关 - 只使用B站播放器
-				// 【重要】修改这里来更换视频！只需要改BVID值即可
-				bilibiliVideoId: 'BV1sP4qz8Eyv', // 改这里：将 BV1sP4qz8Eyv 替换为你的视频BVID
-				videoTitle: '每天一场辩论赛 - 关于人生痛苦的完整版讨论',
-				bilibiliEmbedPlayerUrl: 'https://player.bilibili.com/player.html?bvid=BV1sP4qz8Eyv&page=1&autoplay=0&high_quality=1&danmaku=0&as_wide=1&hide_title=0&hide_share=1&hide_bottom=0&loop=0', // B站播放器嵌入URL（已优化兼容性参数）
-				bilibiliPlayerLoaded: false, // B站播放器是否已加载
-				playerRetryCount: 0, // 播放器加载重试次数
-				iframeLoadError: false, // iframe加载错误标志
 
-			// 视频播放状态管理 - 保证收起时后台播放
-			videoCurrentTime: 0, // 视频当前播放时间
-			videoPlaybackTimer: null, // 视频播放监控定时器
-			isVideoPlayingInBackground: false, // 视频是否在后台播放中
 				
 				// 百分数变化提示
 				showPercentageTip: false, // 是否显示百分数变化提示
@@ -597,9 +547,6 @@
 			if (this.topBarSimulationTimer) {
 				clearInterval(this.topBarSimulationTimer);
 			}
-			if (this.videoPlaybackTimer) {
-				clearInterval(this.videoPlaybackTimer);
-			}
 		},
 		onReady() {
 			// 页面渲染完成后设置安全区域
@@ -632,73 +579,6 @@
 			},
 			toggleLiveCollapse() {
 				this.isLiveCollapsed = !this.isLiveCollapsed;
-				
-				// 确保视频在收起状态下继续播放
-				if (this.isLiveCollapsed && this.isLiveStarted) {
-					this.$nextTick(() => {
-
-						setTimeout(() => {
-							this.ensureVideoPlaying();
-							// 启动定时器监控视频播放状态
-							this.startVideoPlaybackMonitor();
-						}, 100);
-					});
-				} else if (!this.isLiveCollapsed && this.isLiveStarted) {
-					// 停止监控定时器
-					this.stopVideoPlaybackMonitor();
-					
-					this.$nextTick(() => {
-						// 等待DOM更新后恢复视频时间
-						setTimeout(() => {
-							this.restoreVideoTime();
-						}, 100);
-					});
-				}
-			},
-			
-			// 确保视频继续播放
-			ensureVideoPlaying() {
-				const videoContext = uni.createVideoContext('liveVideo', this);
-				if (videoContext) {
-					// 确保视频继续播放
-					videoContext.play();
-					console.log('确保视频在收起状态下继续播放');
-				}
-			},
-			
-			// 启动视频播放监控
-			startVideoPlaybackMonitor() {
-				// 清除之前的定时器
-				if (this.videoPlaybackTimer) {
-					clearInterval(this.videoPlaybackTimer);
-				}
-				
-				// 每2秒检查一次视频播放状态
-				this.videoPlaybackTimer = setInterval(() => {
-					if (this.isLiveCollapsed && this.isLiveStarted) {
-						this.ensureVideoPlaying();
-					}
-				}, 2000);
-				
-				console.log('启动视频播放监控');
-			},
-			
-			// 停止视频播放监控
-			stopVideoPlaybackMonitor() {
-				if (this.videoPlaybackTimer) {
-					clearInterval(this.videoPlaybackTimer);
-					this.videoPlaybackTimer = null;
-					console.log('停止视频播放监控');
-				}
-			},
-			
-			// 恢复视频播放时间
-			restoreVideoTime() {
-				const videoContext = uni.createVideoContext('liveVideo', this);
-				if (videoContext && this.videoCurrentTime > 0) {
-					videoContext.seek(this.videoCurrentTime);
-					console.log('恢复视频播放时间到:', this.videoCurrentTime);
-				}
 			},
 			voteLeft() {
 				// 检查直播是否已开始
@@ -859,12 +739,6 @@
 				});
 			},
 			
-			// 播放投票音效（模拟）
-			playVoteSound(type, clickCount) {
-				// 这里可以添加真实的音效播放逻辑
-				// 目前只是模拟不同的音效类型
-				console.log(`播放音效: ${type}, 点击次数: ${clickCount}`);
-			},
 
 			// 触发分割线被击中效果
 			triggerDividerHit() {
@@ -978,7 +852,7 @@
 			
 			// 手动开始直播
 			startLive() {
-				console.log('开始直播，视频ID:', this.bilibiliVideoId);
+				console.log('开始直播');
 
 				this.isLiveStarted = true;
 				this.isLiveEnded = false;
@@ -994,10 +868,6 @@
 				// 启动顶部对抗条模拟
 				this.startTopBarSimulation();
 
-				// 重置播放器加载状态和重试计数
-				this.bilibiliPlayerLoaded = false;
-				this.iframeLoadError = false;
-				this.playerRetryCount = 0;
 
 				uni.showToast({
 					title: '🎬 直播已开始',
@@ -1034,83 +904,6 @@
 			
 			
 
-			// B站播放器加载成功事件
-			onBilibiliPlayerLoad() {
-				this.bilibiliPlayerLoaded = true;
-				this.iframeLoadError = false;
-				this.playerRetryCount = 0; // 重置重试计数
-				console.log('B站播放器加载成功');
-				uni.showToast({
-					title: '✅ 播放器加载成功',
-					icon: 'success',
-					duration: 1000
-				});
-
-				// 加载成功后自动播放（通过postMessage发送播放命令）
-				setTimeout(() => {
-					this.autoPlayBilibiliVideo();
-				}, 500);
-			},
-
-			// 自动播放B站视频（通过uni接口）
-			autoPlayBilibiliVideo() {
-				try {
-					// 在小程序环境中，使用uni.createWebViewContext来控制web-view
-					const webview = uni.createWebViewContext('bilibiliWebView', this);
-					if (webview) {
-						webview.postMessage({
-							data: {
-								action: 'play'
-							}
-						});
-						console.log('已向B站播放器发送播放命令');
-					}
-				} catch (e) {
-					console.warn('自动播放命令发送失败（这是正常的，播放器可能会自动播放）:', e);
-				}
-			},
-
-			// B站播放器加载失败事件
-			onBilibiliPlayerError(e) {
-				console.error('B站播放器加载失败:', e);
-				this.iframeLoadError = true;
-				this.bilibiliPlayerLoaded = false;
-				this.playerRetryCount = (this.playerRetryCount || 0) + 1;
-
-				// 最多重试3次
-				if (this.playerRetryCount < 3) {
-					console.log(`播放器加载失败，${2000}ms后进行第${this.playerRetryCount}次重试...`);
-					uni.showToast({
-						title: `⚠️ 加载失败，正在重试 (${this.playerRetryCount}/3)...`,
-						icon: 'none',
-						duration: 2000
-					});
-
-					// 延迟重新加载 (延长等待时间便于重试)
-					setTimeout(() => {
-						if (this.isLiveStarted) {
-							this.$forceUpdate(); // 强制更新组件，重新加载iframe
-							console.log('第' + this.playerRetryCount + '次重试已触发');
-						}
-					}, 2000);
-				} else {
-					console.log('播放器加载失败次数过多，已停用自动重试');
-					uni.showToast({
-						title: '❌ 播放器加载失败，请检查网络连接或使用备用播放器',
-						icon: 'none',
-						duration: 3000
-					});
-				}
-			},
-
-			// 重新加载播放器（可手动触发）
-			reloadBilibiliPlayer() {
-				console.log('手动重新加载B站播放器...');
-				this.playerRetryCount = 0;
-				this.bilibiliPlayerLoaded = false;
-				this.iframeLoadError = false;
-				this.$forceUpdate();
-			},
 
 
 			// 显示百分数变化
@@ -1293,15 +1086,46 @@
 </script>
 
 <style>
+	/* 全局点击优化 - 解决点击位置偏移问题 */
+	* {
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		-khtml-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+		user-select: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+	
+	/* 确保所有可点击元素都能正确响应 */
+	view, text, button, input {
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+	}
+	
 	.home-container {
 		min-height: 100vh;
 		background: linear-gradient(180deg, #FF69B4 0%, #FF8C00 25%, #FFD700 50%, #32CD32 100%);
 		padding: 20rpx;
 		padding-top: 120rpx;
-		padding-bottom: 40rpx;
+		padding-bottom: 140rpx; /* 合并底部间距设置 */
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
+		/* 添加点击优化 */
+		-webkit-tap-highlight-color: transparent;
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
+		/* 确保没有全局变换影响点击坐标 */
+		transform: none;
+		-webkit-transform: none;
+		/* 确保正确的定位上下文 */
+		position: relative;
+		/* 防止可能的缩放问题 */
+		zoom: 1;
+		-webkit-zoom: 1;
 	}
 
 	/* 票数进度条容器 */
@@ -1339,7 +1163,7 @@
 		height: 120rpx;
 	}
 
-	/* 收起时隐藏但保留DOM - 视频继续在后台播放（关键优化）*/
+	/* 收起时隐藏但保留DOM */
 	.live-section.collapsed-hide {
 		position: absolute;
 		left: -9999rpx;
@@ -1349,7 +1173,6 @@
 		pointer-events: none;
 		opacity: 0;
 		z-index: -1;
-		/* 保持视频播放但不显示 */
 		display: flex;
 		flex-direction: column;
 	}
@@ -1372,146 +1195,8 @@
 	}
 
 
-	/* B站web-view容器 */
-	.bilibili-webview-container {
-		width: 100%;
-		height: 100%;
-		position: relative;
-		background-color: #000;
-		overflow: hidden;
-		/* 确保B站播放器内容不会超出边界 */
-		transform: translateZ(0);
-		-webkit-transform: translateZ(0);
-	}
-	
-	/* 针对B站播放器的特殊样式调整 */
-	.bilibili-webview-container web-view {
-		/* 隐藏B站播放器的标题栏和工具栏 */
-		/* 注意：这些样式可能需要在web-view内部生效 */
-		width: 100%;
-		height: 100%;
-	}
 
-	.bilibili-webview-container.collapsed-video {
-		visibility: hidden;
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 1px;
-		height: 1px;
-		opacity: 0;
-		pointer-events: none;
-		z-index: -1;
-	}
 
-	/* 播放器加载中指示器 */
-	.player-loading {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgba(0, 0, 0, 0.7);
-		color: #fff;
-		font-size: 28rpx;
-		border-radius: 8rpx;
-		padding: 30rpx;
-		z-index: 50;
-	}
-
-	.loading-text {
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
-	}
-
-	/* 播放器加载失败重试区域 */
-	.player-error-retry {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		background: rgba(0, 0, 0, 0.8);
-		padding: 40rpx;
-		border-radius: 8rpx;
-		z-index: 50;
-	}
-
-	.error-text {
-		color: #ff5252;
-		font-size: 32rpx;
-		margin-bottom: 30rpx;
-		font-weight: bold;
-	}
-
-	.retry-button {
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		color: #fff;
-		padding: 20rpx 60rpx;
-		border-radius: 8rpx;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4rpx 15rpx rgba(102, 126, 234, 0.4);
-		transition: all 0.3s ease;
-	}
-
-	.retry-button:active {
-		transform: scale(0.95);
-		box-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.2);
-	}
-
-	.retry-text {
-		font-size: 28rpx;
-		font-weight: bold;
-	}
-
-	/* B站播放器标题遮罩层 */
-	.bilibili-title-mask {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 80rpx; /* 遮罩B站播放器顶部标题区域 */
-		background: linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
-		z-index: 100; /* 确保在B站播放器之上 */
-		pointer-events: none; /* 允许点击穿透 */
-	}
-	
-	/* 视频标题覆盖层 */
-	.video-title-overlay {
-		position: absolute;
-		top: 15rpx;
-		left: 15rpx;
-		background: rgba(0, 0, 0, 0.7);
-		padding: 8rpx 15rpx;
-		border-radius: 15rpx;
-		backdrop-filter: blur(10rpx);
-		max-width: 85%;
-		z-index: 101; /* 确保在遮罩层之上 */
-	}
-
-	.video-title {
-		color: #FFFFFF;
-		font-size: 24rpx;
-		font-weight: 500;
-		line-height: 1.4;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 1;
-		line-clamp: 1; /* 标准属性 */
-		-webkit-box-orient: vertical;
-	}
 
 	
 	/* 播放按钮 - 左下角 */
@@ -1700,8 +1385,8 @@
 
 	/* 浮动收起按钮 - 右下角 */
 	.collapse-btn-floating {
-		position: absolute; /* 相对于live-section定位 */
-		top: 310rpx; /* 与播放按钮在同一水平线上 */
+		position: absolute; /* 相对于live-video-container定位 */
+		bottom: 20rpx; /* 与播放按钮使用相同的bottom定位 */
 		right: 10rpx;
 		width: 60rpx;
 		height: 60rpx;
@@ -1716,7 +1401,7 @@
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		cursor: pointer;
 		backdrop-filter: blur(10rpx);
-		z-index: 9999; /* 固定层级确保始终在最上层 */
+		z-index: 10000; /* 进一步提高层级 */
 		pointer-events: auto; /* 确保按钮能接收点击事件 */
 		user-select: none; /* 防止按钮被选中 */
 		-webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
@@ -1728,52 +1413,14 @@
 		color: #FFFFFF;
 		text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
 		line-height: 1;
+		/* 添加额外的点击优化 */
+		-webkit-touch-callout: none; /* 禁用长按菜单 */
+		-webkit-user-drag: none; /* 禁用拖拽 */
+		-khtml-user-select: none; /* 兼容性设置 */
+		-webkit-appearance: none; /* 移除默认样式 */
+		appearance: none; /* 移除默认样式 */
 	}
 
-	/* 切换视频源按钮 - 右上角 */
-	.switch-video-btn {
-		position: absolute;
-		top: 15rpx;
-		right: 15rpx;
-		width: 60rpx;
-		height: 60rpx;
-		background: linear-gradient(135deg, rgba(255, 20, 147, 0.9) 0%, rgba(255, 105, 180, 0.9) 100%);
-		border: 2rpx solid rgba(255, 255, 255, 0.3);
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4rpx 15rpx rgba(255, 20, 147, 0.4),
-		            0 0 0 1rpx rgba(255, 255, 255, 0.1);
-		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-		cursor: pointer;
-		backdrop-filter: blur(10rpx);
-		z-index: 9999; /* 提高层级确保按钮始终在交互层上面 */
-		pointer-events: auto; /* 确保按钮能接收点击事件 */
-	}
-
-	.switch-video-btn:active {
-		transform: scale(0.95);
-		box-shadow: 0 2rpx 8rpx rgba(255, 20, 147, 0.3),
-		            0 0 0 1rpx rgba(255, 255, 255, 0.2);
-	}
-
-	.switch-video-btn:hover {
-		transform: scale(1.05);
-		box-shadow: 0 6rpx 20rpx rgba(255, 20, 147, 0.5),
-		            0 0 0 2rpx rgba(255, 255, 255, 0.2);
-	}
-
-	.switch-icon {
-		font-size: 24rpx;
-		color: #FFFFFF;
-		text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
-		transition: transform 0.3s ease;
-	}
-
-	.switch-video-btn:active .switch-icon {
-		transform: scale(0.9);
-	}
 
 	.collapse-btn-floating:active {
 		transform: scale(0.95);
@@ -3316,10 +2963,6 @@
 		font-weight: bold;
 	}
 
-	/* 为主容器添加底部间距，避免被导航栏遮挡 */
-	.home-container {
-		padding-bottom: 140rpx;
-	}
 
 	/* 自定义弹窗样式 */
 	.custom-modal-mask {
