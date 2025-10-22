@@ -1,0 +1,22 @@
+{
+  "name": "live",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@dcloudio/uni-ui": "^1.5.11",
+    "vant-weapp": "^0.5.29"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.25",
+    "@types/node": "^24.9.1",
+    "@types/uni-app": "^1.4.8",
+    "typescript": "^5.9.3"
+  }
+}
