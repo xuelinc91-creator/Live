@@ -2,13 +2,13 @@
 	<view class="home-container">
 		<!-- 直播画面区域 - 优化：改用CSS隐藏而非v-if卸载，保证视频后台播放 -->
 		<view class="live-section" :class="{ 'collapsed-hide': isLiveCollapsed }">
+		<!-- 收起按钮 - 浮动在右下角（移到容器外面以避免web-view覆盖） -->
+		<view class="collapse-btn-floating" @click="toggleLiveCollapse" @touchstart="toggleLiveCollapse" @touchend="toggleLiveCollapse">
+			▲
+		</view>
+
 			<!-- 直播视频区域 -->
 			<view class="live-video-container">
-				<!-- 收起按钮 - 浮动在右上角 -->
-				<view class="collapse-btn-floating" @click="toggleLiveCollapse">
-					<text class="collapse-icon">▲</text>
-				</view>
-				
 				<!-- 票数进度条对比 - 浮动在直播画面上方（实时统计） -->
 				<view class="vote-progress-overlay">
 					<view class="progress-bar">
@@ -1320,7 +1320,7 @@
 		top: 15rpx;
 		left: 20rpx;
 		right: 20rpx;
-		z-index: 9999; /* 提高层级，确保在B站播放器之上 */
+		z-index: 20; /* 降低层级，不遮挡交互元素 */
 		pointer-events: none; /* 允许点击穿透到下层 */
 	}
 
@@ -1330,8 +1330,9 @@
 		border: 6rpx solid #000;
 		border-radius: 30rpx;
 		margin-bottom: 20rpx;
-		overflow: hidden;
+		overflow: visible; /* 改为visible，允许按钮显示在容器外 */
 		transition: all 0.3s ease;
+		position: relative; /* 为绝对定位的子元素建立定位上下文 */
 	}
 
 	.live-section.collapsed {
@@ -1699,9 +1700,9 @@
 
 	/* 浮动收起按钮 - 右下角 */
 	.collapse-btn-floating {
-		position: absolute;
-		bottom: 15rpx;
-		right: 15rpx;
+		position: absolute; /* 相对于live-section定位 */
+		top: 310rpx; /* 与播放按钮在同一水平线上 */
+		right: 10rpx;
 		width: 60rpx;
 		height: 60rpx;
 		background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
@@ -1715,7 +1716,18 @@
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		cursor: pointer;
 		backdrop-filter: blur(10rpx);
-		z-index: 30;
+		z-index: 9999; /* 固定层级确保始终在最上层 */
+		pointer-events: auto; /* 确保按钮能接收点击事件 */
+		user-select: none; /* 防止按钮被选中 */
+		-webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+		-webkit-user-select: none; /* 兼容性设置 */
+		-moz-user-select: none; /* 兼容性设置 */
+		-ms-user-select: none; /* 兼容性设置 */
+		touch-action: manipulation; /* 优化触摸响应 */
+		font-size: 24rpx;
+		color: #FFFFFF;
+		text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+		line-height: 1;
 	}
 
 	/* 切换视频源按钮 - 右上角 */
@@ -1736,7 +1748,8 @@
 		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		cursor: pointer;
 		backdrop-filter: blur(10rpx);
-		z-index: 30;
+		z-index: 9999; /* 提高层级确保按钮始终在交互层上面 */
+		pointer-events: auto; /* 确保按钮能接收点击事件 */
 	}
 
 	.switch-video-btn:active {
@@ -1774,15 +1787,10 @@
 		            0 0 0 2rpx rgba(255, 255, 255, 0.2);
 	}
 
-	.collapse-btn-floating .collapse-icon {
-		font-size: 24rpx;
-		color: #FFFFFF;
-		text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
-		transition: transform 0.3s ease;
-	}
-
-	.collapse-btn-floating:active .collapse-icon {
-		transform: scale(0.9);
+	.collapse-btn-floating:active {
+		transform: scale(0.95);
+		box-shadow: 0 2rpx 8rpx rgba(102, 126, 234, 0.3),
+		            0 0 0 1rpx rgba(255, 255, 255, 0.2);
 	}
 
 	/* 票数进度条样式 */
@@ -1821,6 +1829,7 @@
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
+		pointer-events: none; /* 允许点击穿透到下层 */
 	}
 
 	.left-fill {
@@ -1868,6 +1877,7 @@
 		height: 100%;
 		padding: 0 15rpx;
 		gap: 8rpx;
+		pointer-events: none; /* 允许点击穿透到下层 */
 	}
 
 	.left-text {
